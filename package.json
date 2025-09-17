@@ -1,0 +1,45 @@
+{
+  "name": "gloria-sdk",
+  "version": "0.0.1",
+  "description": "TypeScript SDK for Gloria AI News Hub - Real-time financial and crypto news",
+  "main": "dist/index.js",
+  "module": "src/index.ts",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/index.ts --outdir ./dist --target node",
+    "dev": "bun --hot examples/full-demo.ts",
+    "example:news": "bun run examples/fetch-news.ts",
+    "example:recaps": "bun run examples/fetch-recaps.ts",
+    "example:websocket": "bun run examples/websocket.ts",
+    "example:full": "bun run examples/full-demo.ts",
+    "example:minimal": "bun run examples/minimal.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "bun run build"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "keywords": [
+    "gloria",
+    "ai",
+    "news",
+    "crypto",
+    "websocket",
+    "financial",
+    "api",
+    "sdk",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

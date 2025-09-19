@@ -8,7 +8,8 @@ A TypeScript client for the Gloria AI News Hub API, providing real-time news upd
 - 📊 **Recap API** - Get AI-generated summaries by timeframe
 - 🔄 **WebSocket** - Real-time updates with auto-reconnection
 - 🎯 **Topic Management** - Configure topics once, use everywhere
-- 🔒 **Type-Safe** - Full TypeScript support
+- 🔒 **Type-Safe** - Full TypeScript support with runtime validation via [arktype](https://arktype.io)
+- ✅ **Runtime Validation** - Automatic validation of API responses and WebSocket messages
 
 ## Installation
 
@@ -165,18 +166,32 @@ gloria.setTopics(['crypto', 'defi']);
 
 ## TypeScript Support
 
-The SDK includes full TypeScript definitions:
+The SDK includes full TypeScript definitions with runtime validation:
 
 ```typescript
-import { GloriaClient, NewsItem, RecapData, WebSocketMessage } from 'gloria-sdk';
+import { 
+  GloriaClient, 
+  NewsItem, 
+  RecapData, 
+  WebSocketMessage,
+  // Optional: Import validators for custom validation
+  NewsItemSchema,
+  WebSocketMessageSchema 
+} from 'gloria-sdk';
 
 const handleMessage = (message: WebSocketMessage) => {
-  // Type-safe message handling
+  // Type-safe message handling with automatic validation
 };
 
 const processNews = (items: NewsItem[]) => {
   // Type-safe news processing
 };
+
+// Optional: Use validators directly
+const validated = NewsItemSchema(data);
+if (validated instanceof Error) {
+  console.error('Invalid news item:', validated);
+}
 ```
 
 ## WebSocket Features

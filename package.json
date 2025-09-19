@@ -41,5 +41,8 @@
   },
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "dependencies": {
+    "arktype": "^2.1.22"
   }
 }

@@ -1,32 +1,43 @@
-export interface GloriaConfig {
-  apiKey?: string;
-  baseUrl?: string;
-  wsUrl?: string;
-  topics?: string[];
-  defaultLimit?: number;
-  defaultTimeframe?: string;
-}
+import { type } from 'arktype';
 
-export interface NewsItem {
-  timestamp: number;
-  signal: string;
-  feed_category?: string;
-  [key: string]: any;
-}
+export const GloriaConfig = type({
+  "apiKey?": "string",
+  "baseUrl?": "string",
+  "wsUrl?": "string",
+  "topics?": "string[]",
+  "defaultLimit?": "number",
+  "defaultTimeframe?": "string"
+});
 
-export interface RecapData {
-  [key: string]: any;
-}
+export type GloriaConfig = typeof GloriaConfig.infer;
 
-export interface WebSocketMessage {
-  type: 'subscribe' | 'unsubscribe' | 'pong' | 'data' | 'error' | 'ping';
-  feed_category?: string;
-  content?: any;
-  action?: string;
-  error?: string;
-  details?: string;
-  timestamp?: number;
-}
+export const NewsItem = type({
+  timestamp: "number",
+  signal: "string",
+  "feed_category?": "string",
+  "[string]": "unknown"
+});
+
+export type NewsItem = typeof NewsItem.infer;
+
+// Enhanced RecapData with common properties while still allowing any additional properties
+export const RecapData = type({
+  "[string]": "unknown"
+});
+
+export type RecapData = typeof RecapData.infer;
+
+export const WebSocketMessage = type({
+  type: "'subscribe' | 'unsubscribe' | 'pong' | 'data' | 'error' | 'ping' | 'connected' | 'subscribed'",
+  "feed_category?": "string",
+  "content?": "unknown",
+  "action?": "string",
+  "error?": "string", 
+  "details?": "string",
+  "timestamp?": "number"
+});
+
+export type WebSocketMessage = typeof WebSocketMessage.infer;
 
 export class GloriaClient {
   private apiKey: string;
@@ -44,6 +55,14 @@ export class GloriaClient {
   private subscribedTopics: Set<string> = new Set();
 
   constructor(config?: GloriaConfig) {
+    // Validate config if provided
+    if (config) {
+      const validated = GloriaConfig(config);
+      if (validated instanceof type.errors) {
+        throw new Error(`Invalid config: ${validated.summary}`);
+      }
+    }
+    
     this.apiKey = config?.apiKey || process.env.GLORIA_AI_API_KEY || '';
     this.baseUrl = config?.baseUrl || 'https://ai-hub.cryptobriefing.com';
     this.wsUrl = config?.wsUrl || 'wss://ai-hub.cryptobriefing.com/ws/feed';
@@ -81,8 +100,15 @@ export class GloriaClient {
 
       this.socket.addEventListener('message', (event) => {
         try {
-          const message: WebSocketMessage = JSON.parse(event.data);
-          this.handleMessage(message);
+          const rawMessage = JSON.parse(event.data);
+          const validated = WebSocketMessage(rawMessage);
+          
+          if (validated instanceof type.errors) {
+            console.error('Invalid WebSocket message:', validated.summary);
+            return;
+          }
+          
+          this.handleMessage(validated);
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
         }
@@ -103,24 +129,37 @@ export class GloriaClient {
   }
 
   private handleMessage(message: WebSocketMessage) {
-    switch (message.type) {
+    // Validate message with arktype
+    const validated = WebSocketMessage(message);
+    if (validated instanceof type.errors) {
+      console.error('Invalid WebSocket message:', validated.summary);
+      return;
+    }
+
+    switch (validated.type) {
+      case 'connected':
+        console.log('WebSocket connection confirmed');
+        break;
+      case 'subscribed':
+        console.log(`Successfully subscribed to ${validated.feed_category}`);
+        break;
       case 'data':
-        if (message.action === 'subscribed') {
-          console.log(`Successfully subscribed to ${message.feed_category}`);
+        if (validated.action === 'subscribed') {
+          console.log(`Successfully subscribed to ${validated.feed_category}`);
         }
         break;
       case 'error':
-        console.error('Error:', message.error, message.details);
+        console.error('Error:', validated.error, validated.details);
         break;
       case 'ping':
-        this.pong(message.timestamp);
+        this.pong(validated.timestamp);
         break;
     }
 
     // Call custom handlers
-    const handler = this.messageHandlers.get(message.type);
+    const handler = this.messageHandlers.get(validated.type);
     if (handler) {
-      handler(message);
+      handler(validated);
     }
   }
 
@@ -237,7 +276,22 @@ export class GloriaClient {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
-    return response.json() as Promise<NewsItem[]>;
+    const data = await response.json();
+    
+    // Validate each news item
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid response: expected array of news items');
+    }
+    
+    return data.map((item: unknown) => {
+      const validated = NewsItem(item);
+      if (validated instanceof type.errors) {
+        console.warn('Invalid news item:', validated.summary);
+        // Return a minimal valid object or skip
+        return { timestamp: Date.now(), signal: 'invalid' };
+      }
+      return validated;
+    });
   }
 
   // Recap API methods
@@ -254,7 +308,14 @@ export class GloriaClient {
       throw new Error(`HTTP error! Status: ${response.status} for ${feedCategory}`);
     }
 
-    return response.json() as Promise<RecapData>;
+    const data = await response.json();
+    const validated = RecapData(data);
+    
+    if (validated instanceof type.errors) {
+      throw new Error(`Invalid recap data: ${validated.summary}`);
+    }
+    
+    return validated;
   }
 
   // Fetch recaps for all configured topics

@@ -29,7 +29,7 @@ yarn add gloria-sdk
 
 ## Setup
 
-1. **Get your API key** from Gloria AI Hub
+1. **Get your API key** from here: [Gloria AI](https://www.itsgloria.ai/api-keys-new)
 
 2. **Create a `.env` file** in your project root:
 ```env

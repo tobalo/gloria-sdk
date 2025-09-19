@@ -1,6 +1,6 @@
 {
   "name": "gloria-sdk",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "TypeScript SDK for Gloria AI News Hub - Real-time financial and crypto news",
   "main": "dist/index.js",
   "module": "src/index.ts",

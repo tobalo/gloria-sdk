@@ -1,7 +1,18 @@
 {
-  "name": "gloria-sdk",
+  "name": "@tobalo/gloria-sdk",
   "version": "0.0.3",
   "description": "TypeScript SDK for Gloria AI News Hub - Real-time financial and crypto news",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tobalo/gloria-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tobalo/gloria-sdk/issues"
+  },
+  "homepage": "https://github.com/tobalo/gloria-sdk#readme",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",

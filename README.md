@@ -51,7 +51,7 @@ const gloria = new GloriaClient({
 const news = await gloria.fetchNews({ limit: 10 });
 
 // Get a recap
-const recap = await gloria.fetchRecap('crypto', '12h');
+const recap = await gloria.fetchRecap('macro', '12h');
 
 // Connect to WebSocket
 await gloria.connect();

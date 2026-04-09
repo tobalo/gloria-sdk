@@ -12,32 +12,110 @@ export const GloriaConfig = type({
 export type GloriaConfig = typeof GloriaConfig.infer;
 
 export const NewsItem = type({
-  timestamp: "number",
+  id: "string",
   signal: "string",
+  sentiment: "'bullish' | 'bearish' | 'neutral'",
+  "sentiment_value": "number | string",
+  timestamp: "number",
+  "feed_categories": "string[]",
+  "short_context": "string",
+  "long_context": "string",
+  "sources": "string[]",
+  "author": "string | null",
+  "tokens": "string[]",
+  "tweet_url": "string",
+  "narrative_id": "string | null",
+  // Deprecated field still returned by some endpoints
   "feed_category?": "string",
+  // Forward compatibility with new API fields
   "[string]": "unknown"
 });
 
 export type NewsItem = typeof NewsItem.infer;
 
-// Enhanced RecapData with common properties while still allowing any additional properties
 export const RecapData = type({
+  feed_category: "string",
+  timeframe: "string",
+  recap: "string",
+  created_at: "string",
   "[string]": "unknown"
 });
 
 export type RecapData = typeof RecapData.infer;
 
 export const WebSocketMessage = type({
-  type: "'subscribe' | 'unsubscribe' | 'pong' | 'data' | 'error' | 'ping' | 'connected' | 'subscribed'",
+  type: "'subscribe' | 'unsubscribe' | 'pong' | 'data' | 'error' | 'ping' | 'connected' | 'subscribed' | 'unsubscribed'",
   "feed_category?": "string",
   "content?": "unknown",
   "action?": "string",
-  "error?": "string", 
+  "error?": "string",
   "details?": "string",
-  "timestamp?": "number"
+  "timestamp?": "number",
+  "message?": "string"
 });
 
 export type WebSocketMessage = typeof WebSocketMessage.infer;
+
+/** All available feed categories */
+export const FEED_CATEGORIES = [
+  'ai',
+  'ai_agents',
+  'base',
+  'bitcoin',
+  'crypto',
+  'dats',
+  'defi',
+  'ethereum',
+  'hyperliquid',
+  'machine_learning',
+  'macro',
+  'on_chain_whale',
+  'perps',
+  'ripple',
+  'rwa',
+  'solana',
+  'tech',
+  'token_listings',
+  'virtuals',
+] as const;
+
+export type FeedCategory = typeof FEED_CATEGORIES[number];
+
+export const NarrativeItem = type({
+  narrative_id: "string",
+  updated_at: "string",
+  tag: "string",
+  summary: "string",
+  content: "unknown[]",
+  "[string]": "unknown"
+});
+
+export type NarrativeItem = typeof NarrativeItem.infer;
+
+export const ArticleItem = type({
+  id: "string",
+  data: "unknown",
+  created_at: "string",
+  "[string]": "unknown"
+});
+
+export type ArticleItem = typeof ArticleItem.infer;
+
+export const TickerSummary = type({
+  summary: "string",
+  "[string]": "unknown"
+});
+
+export type TickerSummary = typeof TickerSummary.infer;
+
+export const FeedCategoryInfo = type({
+  code: "string",
+  name: "string",
+  "recap_timeframe": "string | null",
+  "[string]": "unknown"
+});
+
+export type FeedCategoryInfo = typeof FeedCategoryInfo.infer;
 
 export class GloriaClient {
   private apiKey: string;
@@ -254,6 +332,7 @@ export class GloriaClient {
     limit?: number;
     fromDate?: string;
     toDate?: string;
+    keyword?: string;
     topics?: string[];
   }): Promise<NewsItem[]> {
     const queryParams = new URLSearchParams({
@@ -269,6 +348,9 @@ export class GloriaClient {
     if (params?.toDate) {
       queryParams.append('to_date', params.toDate);
     }
+    if (params?.keyword) {
+      queryParams.append('keyword', params.keyword);
+    }
 
     const response = await fetch(`${this.baseUrl}/news?${queryParams}`);
 
@@ -283,15 +365,15 @@ export class GloriaClient {
       throw new Error('Invalid response: expected array of news items');
     }
     
-    return data.map((item: unknown) => {
+    return data.reduce((acc: NewsItem[], item: unknown) => {
       const validated = NewsItem(item);
       if (validated instanceof type.errors) {
-        console.warn('Invalid news item:', validated.summary);
-        // Return a minimal valid object or skip
-        return { timestamp: Date.now(), signal: 'invalid' };
+        console.warn('Invalid news item, skipping:', validated.summary);
+        return acc;
       }
-      return validated;
-    });
+      acc.push(validated);
+      return acc;
+    }, []);
   }
 
   // Recap API methods
@@ -319,22 +401,193 @@ export class GloriaClient {
   }
 
   // Fetch recaps for all configured topics
-  async fetchAllRecaps(timeframe?: string): Promise<Record<string, RecapData>> {
+  async fetchAllRecaps(timeframe?: string): Promise<Record<string, RecapData | null>> {
     const tf = timeframe || this.defaultTimeframe;
-    const recaps: Record<string, RecapData> = {};
-    
+    const recaps: Record<string, RecapData | null> = {};
+
     await Promise.all(
       this.topics.map(async (topic) => {
         try {
           recaps[topic] = await this.fetchRecap(topic, tf);
         } catch (error) {
           console.error(`Failed to fetch recap for ${topic}:`, error);
-          recaps[topic] = { error: `Failed to fetch: ${error}` };
+          recaps[topic] = null;
         }
       })
     );
-    
+
     return recaps;
+  }
+
+  // Single news item by ID
+  async fetchNewsById(id: string): Promise<NewsItem> {
+    const response = await fetch(
+      `${this.baseUrl}/news/${id}?token=${this.apiKey}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const validated = NewsItem(data);
+
+    if (validated instanceof type.errors) {
+      throw new Error(`Invalid news item: ${validated.summary}`);
+    }
+
+    return validated;
+  }
+
+  // Ticker summary
+  async fetchTickerSummary(ticker: string): Promise<TickerSummary> {
+    const response = await fetch(
+      `${this.baseUrl}/news-ticker-summary?token=${this.apiKey}&ticker=${encodeURIComponent(ticker)}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const validated = TickerSummary(data);
+
+    if (validated instanceof type.errors) {
+      throw new Error(`Invalid ticker summary: ${validated.summary}`);
+    }
+
+    return validated;
+  }
+
+  // Narratives API
+  async fetchNarratives(): Promise<NarrativeItem[]> {
+    const response = await fetch(
+      `${this.baseUrl}/narratives`,
+      { headers: { 'Authorization': `Bearer ${this.apiKey}` } }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid response: expected array of narratives');
+    }
+
+    return data.reduce((acc: NarrativeItem[], item: unknown) => {
+      const validated = NarrativeItem(item);
+      if (validated instanceof type.errors) {
+        console.warn('Invalid narrative, skipping:', validated.summary);
+        return acc;
+      }
+      acc.push(validated);
+      return acc;
+    }, []);
+  }
+
+  async fetchNarrative(id: string): Promise<NarrativeItem> {
+    const response = await fetch(
+      `${this.baseUrl}/narratives/${id}`,
+      { headers: { 'Authorization': `Bearer ${this.apiKey}` } }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const validated = NarrativeItem(data);
+
+    if (validated instanceof type.errors) {
+      throw new Error(`Invalid narrative: ${validated.summary}`);
+    }
+
+    return validated;
+  }
+
+  // Articles API
+  async fetchArticles(params?: {
+    limit?: number;
+    page?: number;
+    category?: string;
+    search?: string;
+    type?: string;
+  }): Promise<ArticleItem[]> {
+    const queryParams = new URLSearchParams({ token: this.apiKey });
+
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.category) queryParams.append('category', params.category);
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.type) queryParams.append('type', params.type);
+
+    const response = await fetch(`${this.baseUrl}/articles?${queryParams}`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid response: expected array of articles');
+    }
+
+    return data.reduce((acc: ArticleItem[], item: unknown) => {
+      const validated = ArticleItem(item);
+      if (validated instanceof type.errors) {
+        console.warn('Invalid article, skipping:', validated.summary);
+        return acc;
+      }
+      acc.push(validated);
+      return acc;
+    }, []);
+  }
+
+  async fetchArticle(id: string): Promise<ArticleItem> {
+    const response = await fetch(
+      `${this.baseUrl}/articles/${id}?token=${this.apiKey}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const validated = ArticleItem(data);
+
+    if (validated instanceof type.errors) {
+      throw new Error(`Invalid article: ${validated.summary}`);
+    }
+
+    return validated;
+  }
+
+  // Feed categories
+  async fetchAvailableCategories(): Promise<FeedCategoryInfo[]> {
+    const response = await fetch(`${this.baseUrl}/available-feed-categories`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!Array.isArray(data)) {
+      throw new Error('Invalid response: expected array of categories');
+    }
+
+    return data.reduce((acc: FeedCategoryInfo[], item: unknown) => {
+      const validated = FeedCategoryInfo(item);
+      if (validated instanceof type.errors) {
+        console.warn('Invalid category, skipping:', validated.summary);
+        return acc;
+      }
+      acc.push(validated);
+      return acc;
+    }, []);
   }
 
   // Getters for configuration
